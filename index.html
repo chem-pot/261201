@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>전기적 성질에 따른 물질 시뮬레이션</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+            min-height: 100vh;
+            color: white;
+        }
+
+        .header {
+            text-align: center;
+            padding: 30px 20px 15px;
+        }
+        .header h1 {
+            font-size: 2rem;
+            color: #e0e0ff;
+            text-shadow: 0 0 20px rgba(100,150,255,0.8);
+            margin-bottom: 8px;
+        }
+        .header p { font-size: 1rem; color: #aab4d4; }
+
+        /* ── 버튼 ── */
+        .btn-container {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            padding: 18px 20px;
+            flex-wrap: wrap;
+        }
+        .main-btn {
+            padding: 15px 55px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .btn-conductor {
+            background: linear-gradient(135deg, #f7971e, #ffd200);
+            color: #1a1a1a;
+            box-shadow: 0 5px 20px rgba(255,200,0,0.4);
+        }
+        .btn-conductor:hover  { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(255,200,0,0.6); }
+        .btn-conductor.active { transform: scale(1.05); animation: glowY 1.5s infinite; }
+
+        .btn-insulator {
+            background: linear-gradient(135deg, #4facfe, #00f2fe);
+            color: #1a1a1a;
+            box-shadow: 0 5px 20px rgba(0,200,255,0.4);
+        }
+        .btn-insulator:hover  { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(0,200,255,0.6); }
+        .btn-insulator.active { transform: scale(1.05); animation: glowB 1.5s infinite; }
+
+        @keyframes glowY { 0%,100%{box-shadow:0 0 30px rgba(255,200,0,0.7)} 50%{box-shadow:0 0 60px rgba(255,200,0,1)} }
+        @keyframes glowB { 0%,100%{box-shadow:0 0 30px rgba(0,200,255,0.7)} 50%{box-shadow:0 0 60px rgba(0,200,255,1)} }
+
+        /* ── 레이아웃 ── */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px 20px 50px;
+            gap: 24px;
+        }
+
+        .card {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid rgba(255,255,255,0.13);
+            border-radius: 20px;
+            padding: 22px;
+        }
+
+        /* ── 상단 3열 ── */
+        .top-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            width: 100%;
+            max-width: 1200px;
+        }
+        @media(max-width:900px){ .top-section{ grid-template-columns:1fr; } }
+
+        .sim-title {
+            text-align: center;
+            font-size: 1rem;
+            color: #ccd6f6;
+            margin-bottom: 12px;
+        }
+        canvas { display:block; margin:0 auto; border-radius:12px; background:#0a0a1a; }
+
+        .current-status {
+            text-align: center;
+            font-size: 0.95rem;
+            padding: 9px 18px;
+            border-radius: 25px;
+            margin-top: 12px;
+            font-weight: bold;
+            transition: all 0.5s;
+        }
+        .status-on  { background:rgba(255,200,0,0.2); color:#ffd200; border:1px solid #ffd200; animation:sPulse 1.5s infinite; }
+        .status-off { background:rgba(100,100,150,0.2); color:#8888aa; border:1px solid #555577; }
+        @keyframes sPulse { 0%,100%{opacity:1} 50%{opacity:0.55} }
+
+        /* ── 설명 박스 ── */
+        .desc-box h2 { font-size:1.3rem; margin-bottom:13px; padding-bottom:9px; border-bottom:2px solid rgba(255,255,255,0.18); }
+        .desc-conductor h2 { color:#ffd200; }
+        .desc-insulator h2 { color:#00f2fe; }
+        .definition { font-size:0.93rem; line-height:1.8; color:#dde4f5; margin-bottom:13px; }
+        .highlight-box { border-radius:10px; padding:13px; margin-bottom:13px; font-size:0.88rem; line-height:1.7; }
+        .hl-c { background:rgba(255,200,0,0.11); border-left:4px solid #ffd200; color:#ffe680; }
+        .hl-i { background:rgba(0,200,255,0.11); border-left:4px solid #00f2fe; color:#80eeff; }
+        .prop-list { list-style:none; }
+        .prop-list li { padding:5px 0; font-size:0.88rem; color:#c8d6f0; display:flex; align-items:flex-start; gap:7px; }
+        .prop-list li::before { content:"▶"; font-size:0.65rem; margin-top:4px; flex-shrink:0; }
+        .c-li::before { color:#ffd200; }
+        .i-li::before { color:#00f2fe; }
+
+        .welcome-msg { text-align:center; padding:30px 10px; color:#8899bb; font-size:1rem; }
+        .welcome-msg span { font-size:3rem; display:block; margin-bottom:14px; }
+
+        /* ── 저항 비교 바 ── */
+        .resist-section { width:100%; max-width:1200px; }
+        .resist-section h3 { text-align:center; color:#ccd6f6; font-size:1.1rem; margin-bottom:14px; }
+        .bar-row { display:flex; align-items:center; margin-bottom:11px; gap:12px; }
+        .bar-label { width:70px; font-size:0.83rem; color:#aab4d4; text-align:right; flex-shrink:0; }
+        .bar-track { flex:1; height:22px; background:rgba(255,255,255,0.05); border-radius:11px; overflow:hidden; }
+        .bar-fill { height:100%; border-radius:11px; display:flex; align-items:center; padding-left:10px; font-size:0.73rem; font-weight:bold; color:rgba(0,0,0,0.72); }
+        .fill-c { background:linear-gradient(90deg,#f7971e,#ffd200); }
+        .fill-s { background:linear-gradient(90deg,#a855f7,#ec4899); color:rgba(255,255,255,0.85); }
+        .fill-i { background:linear-gradient(90deg,#4facfe,#00f2fe); }
+
+        /* ── 예시 섹션 ── */
+        .examples-section {
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        /* 초기 안내 박스 */
+        .examples-guide {
+            text-align: center;
+            padding: 40px 20px;
+            color: #8899bb;
+        }
+        .examples-guide .guide-icon { font-size: 3rem; margin-bottom: 14px; display: block; }
+        .examples-guide p { font-size: 1rem; line-height: 1.8; }
+
+        /* 예시 타이틀 */
+        .examples-title {
+            text-align: center;
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            padding: 14px 20px;
+            border-radius: 14px;
+            display: none;
+        }
+        .examples-title.show { display: block; }
+        .title-conductor {
+            background: rgba(255,200,0,0.15);
+            color: #ffd200;
+            border: 2px solid rgba(255,200,0,0.4);
+        }
+        .title-insulator {
+            background: rgba(0,200,255,0.15);
+            color: #00f2fe;
+            border: 2px solid rgba(0,200,255,0.4);
+        }
+
+        /* 예시 그리드 */
+        .examples-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+            gap: 15px;
+        }
+
+        /* 카드 진입 애니메이션 */
+        @keyframes cardIn {
+            from { opacity:0; transform: translateY(20px) scale(0.9); }
+            to   { opacity:1; transform: translateY(0)   scale(1);   }
+        }
+
+        .ex-card {
+            background: rgba(255,255,255,0.06);
+            border-radius: 16px;
+            padding: 20px 12px;
+            text-align: center;
+            cursor: default;
+            border: 2px solid transparent;
+            animation: cardIn 0.4s ease forwards;
+            opacity: 0;
+        }
+        .ex-card.c-card {
+            border-color: rgba(255,200,0,0.3);
+            box-shadow: 0 4px 15px rgba(255,200,0,0.08);
+        }
+        .ex-card.c-card:hover {
+            background: rgba(255,200,0,0.13);
+            border-color: #ffd200;
+            transform: translateY(-6px);
+            box-shadow: 0 10px 28px rgba(255,200,0,0.3);
+            transition: all 0.25s;
+        }
+        .ex-card.i-card {
+            border-color: rgba(0,200,255,0.3);
+            box-shadow: 0 4px 15px rgba(0,200,255,0.08);
+        }
+        .ex-card.i-card:hover {
+            background: rgba(0,200,255,0.13);
+            border-color: #00f2fe;
+            transform: translateY(-6px);
+            box-shadow: 0 10px 28px rgba(0,200,255,0.3);
+            transition: all 0.25s;
+        }
+
+        .ex-icon { font-size: 2.5rem; margin-bottom: 10px; display: block; }
+        .ex-name { font-size: 0.95rem; font-weight: bold; margin-bottom: 6px; color: #e0e8ff; }
+        .ex-tag  {
+            font-size: 0.73rem; padding: 3px 10px;
+            border-radius: 20px; display: inline-block; margin-bottom: 6px;
+        }
+        .tag-c { background:rgba(255,200,0,0.22); color:#ffd200; }
+        .tag-i { background:rgba(0,200,255,0.22); color:#00f2fe; }
+        .ex-desc { font-size: 0.75rem; color: #8899bb; line-height: 1.4; }
+
+        /* ── 반도체 안내 ── */
+        .semi-info {
+            width: 100%;
+            max-width: 1200px;
+            background: rgba(180,100,255,0.08);
+            border: 2px solid rgba(180,100,255,0.3);
+            border-radius: 20px;
+            padding: 20px 26px;
+        }
+        .semi-info h3 { color:#cc88ff; font-size:1.05rem; margin-bottom:9px; }
+        .semi-info p  { color:#c0aadd; font-size:0.92rem; line-height:1.75; }
+
+        @media(max-width:600px){
+            .header h1 { font-size:1.4rem; }
+            .main-btn  { padding:12px 30px; font-size:1rem; }
+            canvas     { width:260px !important; height:200px !important; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>⚡ 전기적 성질에 따른 물질 시뮬레이션</h1>
+    <p>도체와 부도체의 차이를 직접 확인해보세요!</p>
+</div>
+
+<!-- 버튼 -->
+<div class="btn-container">
+    <button class="main-btn btn-conductor" id="btnConductor" onclick="showConductor()">⚡ 도체 (Conductor)</button>
+    <button class="main-btn btn-insulator" id="btnInsulator" onclick="showInsulator()">🛡️ 부도체 (Insulator)</button>
+</div>
+
+<div class="main-content">
+
+    <!-- ① 상단 3열 -->
+    <div class="top-section">
+
+        <!-- 분자 시뮬레이션 -->
+        <div class="card">
+            <p class="sim-title" id="simTitle">🔬 물질 내부 시뮬레이션</p>
+            <canvas id="simCanvas" width="330" height="260"></canvas>
+            <div class="current-status status-off" id="simStatus">버튼을 눌러 시작하세요</div>
+        </div>
+
+        <!-- 회로 시뮬레이션 -->
+        <div class="card">
+            <p class="sim-title" id="circuitTitle">💡 회로 시뮬레이션</p>
+            <canvas id="circuitCanvas" width="330" height="260"></canvas>
+            <div class="current-status status-off" id="circuitStatus">회로 상태 대기 중</div>
+        </div>
+
+        <!-- 설명 -->
+        <div class="card desc-box" id="descBox">
+            <div class="welcome-msg">
+                <span>🔍</span>
+                위 버튼을 눌러서<br>도체 또는 부도체를<br>선택해보세요!
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ② 저항 비교 -->
+    <div class="card resist-section">
+        <h3>📊 전기 저항 비교</h3>
+        <div class="bar-row">
+            <div class="bar-label">도체</div>
+            <div class="bar-track"><div class="bar-fill fill-c" style="width:8%">매우 낮음</div></div>
+            <div style="font-size:0.78rem;color:#ffd200;width:65px;">≈ 10⁻⁸ Ω</div>
+        </div>
+        <div class="bar-row">
+            <div class="bar-label">반도체</div>
+            <div class="bar-track"><div class="bar-fill fill-s" style="width:46%">중간</div></div>
+            <div style="font-size:0.78rem;color:#cc88ff;width:65px;">≈ 10² Ω</div>
+        </div>
+        <div class="bar-row">
+            <div class="bar-label">부도체</div>
+            <div class="bar-track"><div class="bar-fill fill-i" style="width:95%">매우 높음</div></div>
+            <div style="font-size:0.78rem;color:#00f2fe;width:65px;">≈ 10¹² Ω</div>
+        </div>
+    </div>
+
+    <!-- ③ 예시 섹션 (버튼 클릭 시 해당 예시만 표시) -->
+    <div class="card examples-section" id="examplesSection">
+
+        <!-- 초기 안내 -->
+        <div class="examples-guide" id="examplesGuide">
+            <span class="guide-icon">📌</span>
+            <p>도체 또는 부도체 버튼을 누르면<br>해당 물질의 예시들이 여기에 나타나요!</p>
+        </div>
+
+        <!-- 도체 타이틀 -->
+        <div class="examples-title title-conductor" id="titleConductor">
+            ⚡ 도체 예시 — 전기가 잘 통하는 물질들
+        </div>
+
+        <!-- 부도체 타이틀 -->
+        <div class="examples-title title-insulator" id="titleInsulator">
+            🛡️ 부도체 예시 — 전기가 통하지 않는 물질들
+        </div>
+
+        <!-- 카드 그리드 -->
+        <div class="examples-grid" id="examplesGrid"></div>
+
+    </div>
+
+    <!-- ④ 반도체 안내 -->
+    <div class="semi-info">
+        <h3>💡 반도체(Semiconductor)도 있어요!</h3>
+        <p>
+            도체와 부도체의 중간 성질을 가진 물질을 <strong>반도체</strong>라고 해요.
+            실리콘(Si), 저마늄(Ge) 등이 대표적이며 스마트폰·컴퓨터 칩에 사용돼요.
+            온도가 높아지면 전기가 잘 흐르고, 낮아지면 잘 흐르지 않는 특이한 성질을 가져요!
+        </p>
+    </div>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════════
+   예시 데이터
+═══════════════════════════════════════════ */
+const conductorData = [
+    { name:"구리",     icon:"🪙", desc:"전선·회로판의 핵심 재료" },
+    { name:"알루미늄", icon:"🔩", desc:"고압 송전선에 사용"       },
+    { name:"철",       icon:"⚙️", desc:"구조물·전기 회로 부품"    },
+    { name:"금",       icon:"🥇", desc:"반도체 접점·고급 단자"    },
+    { name:"은",       icon:"🏅", desc:"전도율이 가장 높은 금속"  },
+    { name:"흑연",     icon:"✏️", desc:"비금속이지만 전기 도체"   },
+];
+const insulatorData = [
+    { name:"유리",     icon:"🪟", desc:"고압 전선 절연에 사용"   },
+    { name:"고무",     icon:"⭕", desc:"전선 피복·장갑 재료"     },
+    { name:"플라스틱", icon:"🧴", desc:"전기 제품 케이스·스위치" },
+    { name:"도자기",   icon:"🍶", desc:"전선 지지(애자) 재료"    },
+    { name:"나무",     icon:"🪵", desc:"건조 시 절연 재료"       },
+    { name:"공기",     icon:"💨", desc:"자연 상태의 절연체"       },
+];
+
+/* ═══════════════════════════════════════════
+   초기화
+═══════════════════════════════════════════ */
+window.onload = () => {
+    drawInitialCanvas('simCanvas');
+    drawInitialCanvas('circuitCanvas');
+};
+
+/* ═══════════════════════════════════════════
+   애니메이션 관리
+═══════════════════════════════════════════ */
+let simAF = null, circuitAF = null;
+function stopAll() {
+    if (simAF)     { cancelAnimationFrame(simAF);     simAF     = null; }
+    if (circuitAF) { cancelAnimationFrame(circuitAF); circuitAF = null; }
+}
+
+/* ═══════════════════════════════════════════
+   초기 캔버스
+═══════════════════════════════════════════ */
+function drawInitialCanvas(id) {
+    const cv = document.getElementById(id);
+    const ctx = cv.getContext('2d');
+    fillBg(ctx, cv.width, cv.height, '#0a0a1a', '#0d1530');
+    ctx.fillStyle = '#667799';
+    ctx.font = '15px Malgun Gothic';
+    ctx.textAlign = 'center';
+    ctx.fillText('버튼을 눌러보세요!', cv.width/2, cv.height/2);
+}
+
+function fillBg(ctx, W, H, c1, c2) {
+    const g = ctx.createLinearGradient(0,0,W,H);
+    g.addColorStop(0,c1); g.addColorStop(1,c2);
+    ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+}
+
+/* ═══════════════════════════════════════════
+   예시 카드 렌더링
+═══════════════════════════════════════════ */
+function renderExamples(type) {
+    const guide       = document.getElementById('examplesGuide');
+    const titleC      = document.getElementById('titleConductor');
+    const titleI      = document.getElementById('titleInsulator');
+    const grid        = document.getElementById('examplesGrid');
+    const data        = type === 'conductor' ? conductorData : insulatorData;
+
+    /* 안내 숨기기 */
+    guide.style.display = 'none';
+
+    /* 타이틀 전환 */
+    if (type === 'conductor') {
+        titleC.classList.add('show');
+        titleI.classList.remove('show');
+    } else {
+        titleI.classList.add('show');
+        titleC.classList.remove('show');
+    }
+
+    /* 기존 카드 제거 후 새 카드 생성 */
+    grid.innerHTML = '';
+    data.forEach((item, idx) => {
+        const card = document.createElement('div');
+        card.className = `ex-card ${type === 'conductor' ? 'c-card' : 'i-card'}`;
+        /* 카드마다 진입 딜레이 */
+        card.style.animationDelay = `${idx * 0.07}s`;
+        card.innerHTML = `
+            <span class="ex-icon">${item.icon}</span>
+            <div class="ex-name">${item.name}</div>
+            <span class="ex-tag ${type==='conductor'?'tag-c':'tag-i'}">
+                ${type==='conductor' ? '⚡ 도체' : '🛡️ 부도체'}
+            </span>
+            <div class="ex-desc">${item.desc}</div>
+        `;
+        grid.appendChild(card);
+    });
+}
+
+/* ═══════════════════════════════════════════
+   버튼 핸들러
+═══════════════════════════════════════════ */
+function showConductor() {
+    stopAll();
+    document.getElementById('btnConductor').classList.add('active');
+    document.getElementById('btnInsulator').classList.remove('active');
+
+    updateDesc('conductor');
+    updateStatus('simStatus',     true,  '⚡ 자유 전자가 활발히 이동 중!');
+    updateStatus('circuitStatus', true,  '💡 전구 ON! 전류가 흐르고 있어요');
+    document.getElementById('simTitle').textContent     = '⚡ 도체 내부 — 자유 전자 이동';
+    document.getElementById('circuitTitle').textContent = '💡 도체 연결 — 전구 켜짐';
+
+    renderExamples('conductor');
+    animateConductorSim();
+    animateCircuit(true);
+}
+
+function showInsulator() {
+    stopAll();
+    document.getElementById('btnInsulator').classList.add('active');
+    document.getElementById('btnConductor').classList.remove('active');
+
+    updateDesc('insulator');
+    updateStatus('simStatus',     false, '🚫 전자가 이동하지 못해요');
+    updateStatus('circuitStatus', false, '🚫 전구 OFF! 전류가 흐르지 않아요');
+    document.getElementById('simTitle').textContent     = '🛡️ 부도체 내부 — 전자 고정';
+    document.getElementById('circuitTitle').textContent = '🛡️ 부도체 연결 — 전구 꺼짐';
+
+    renderExamples('insulator');
+    animateInsulatorSim();
+    animateCircuit(false);
+}
+
+function updateStatus(id, on, msg) {
+    const el = document.getElementById(id);
+    el.className  = on ? 'current-status status-on' : 'current-status status-off';
+    el.textContent = msg;
+}
+
+/* ═══════════════════════════════════════════
+   설명 업데이트
+═══════════════════════════════════════════ */
+function updateDesc(type) {
+    const box = document.getElementById('descBox');
+    if (type === 'conductor') {
+        box.className = 'card desc-box desc-conductor';
+        box.innerHTML = `
+        <h2>⚡ 도체 (Conductor)</h2>
+        <p class="definition">
+            <strong>도체</strong>란 전기가 잘 흐르는 물질이에요.<br>
+            내부에 <span style="color:#ffd200;font-weight:bold;">자유 전자</span>가 많아서
+            전압을 걸면 전자들이 자유롭게 이동해 전류를 만들어요.
+        </p>
+        <div class="highlight-box hl-c">
+            ✨ 핵심 포인트<br>
+            자유 전자 풍부 → 전자 이동 활발 → 전류 잘 흐름<br>
+            전기 저항이 매우 <strong>낮아요</strong>
+        </div>
+        <ul class="prop-list">
+            <li class="c-li">대부분의 금속이 도체예요</li>
+            <li class="c-li">전기 에너지를 잘 전달해요</li>
+            <li class="c-li">열도 잘 전달해요 (열전도도 높음)</li>
+            <li class="c-li">전선, 회로, 송전탑에 사용돼요</li>
+            <li class="c-li">흑연(탄소)은 비금속이지만 도체예요</li>
+        </ul>`;
+    } else {
+        box.className = 'card desc-box desc-insulator';
+        box.innerHTML = `
+        <h2>🛡️ 부도체 (Insulator)</h2>
+        <p class="definition">
+            <strong>부도체(절연체)</strong>란 전기가 거의 흐르지 않는 물질이에요.<br>
+            전자들이 원자에 <span style="color:#00f2fe;font-weight:bold;">꽉 묶여 있어서</span>
+            전압을 걸어도 이동하지 못해요.
+        </p>
+        <div class="highlight-box hl-i">
+            🛡️ 핵심 포인트<br>
+            자유 전자 거의 없음 → 전자 이동 불가 → 전류 안 흐름<br>
+            전기 저항이 매우 <strong>높아요</strong>
+        </div>
+        <ul class="prop-list">
+            <li class="i-li">전자들이 원자에 강하게 결합돼 있어요</li>
+            <li class="i-li">전기 에너지를 거의 전달 못해요</li>
+            <li class="i-li">감전 사고를 막는 안전 재료예요</li>
+            <li class="i-li">전선 피복, 콘센트 케이스에 사용돼요</li>
+            <li class="i-li">순수한 물도 부도체에 가까워요</li>
+        </ul>`;
+    }
+}
+
+/* ═══════════════════════════════════════════
+   분자 시뮬레이션 — 도체
+═══════════════════════════════════════════ */
+const electrons = [];
+function initElectrons(W, H) {
+    electrons.length = 0;
+    for (let i = 0; i < 28; i++) {
+        electrons.push({
+            x: Math.random()*W, y: Math.random()*H,
+            r: 3 + Math.random()*2,
+            vx: 1.5 + Math.random()*2,
+            vy: (Math.random()-0.5)*1.5,
+            trail: []
+        });
+    }
+}
+
+function animateConductorSim() {
+    const cv  = document.getElementById('simCanvas');
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    initElectrons(W, H);
+
+    const atoms = [];
+    for (let cx=40; cx<W; cx+=65)
+        for (let cy=40; cy<H; cy+=65)
+            atoms.push({x:cx, y:cy});
+
+    function draw() {
+        fillBg(ctx, W, H, '#100a00','#1a1200');
+
+        atoms.forEach(a => {
+            const ag = ctx.createRadialGradient(a.x,a.y,0,a.x,a.y,16);
+            ag.addColorStop(0,'rgba(255,140,0,0.35)');
+            ag.addColorStop(1,'rgba(255,100,0,0)');
+            ctx.fillStyle=ag; ctx.beginPath(); ctx.arc(a.x,a.y,16,0,Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(a.x,a.y,8,0,Math.PI*2); ctx.fillStyle='#ff8800'; ctx.fill();
+            ctx.beginPath(); ctx.arc(a.x,a.y,5,0,Math.PI*2); ctx.fillStyle='#ffcc44'; ctx.fill();
+            ctx.fillStyle='#1a0a00'; ctx.font='bold 8px Arial'; ctx.textAlign='center';
+            ctx.fillText('+',a.x,a.y+3);
+        });
+
+        electrons.forEach(e => {
+            e.trail.push({x:e.x,y:e.y});
+            if(e.trail.length>10) e.trail.shift();
+            e.x+=e.vx; e.y+=e.vy;
+            if(e.x>W+5){e.x=-5; e.y=Math.random()*H; e.trail=[];}
+            if(e.y<0) e.y=H;
+            if(e.y>H) e.y=0;
+            e.trail.forEach((pt,i)=>{
+                ctx.beginPath(); ctx.arc(pt.x,pt.y,e.r*(i/e.trail.length),0,Math.PI*2);
+                ctx.fillStyle=`rgba(100,200,255,${(i/e.trail.length)*0.38})`; ctx.fill();
+            });
+            const eg=ctx.createRadialGradient(e.x,e.y,0,e.x,e.y,e.r+3);
+            eg.addColorStop(0,'rgba(150,230,255,1)');
+            eg.addColorStop(0.5,'rgba(50,150,255,0.8)');
+            eg.addColorStop(1,'rgba(0,100,255,0)');
+            ctx.beginPath(); ctx.arc(e.x,e.y,e.r+3,0,Math.PI*2); ctx.fillStyle=eg; ctx.fill();
+            ctx.beginPath(); ctx.arc(e.x,e.y,e.r,0,Math.PI*2); ctx.fillStyle='#aaddff'; ctx.fill();
+            ctx.fillStyle='#003060'; ctx.font='bold 8px Arial'; ctx.textAlign='center';
+            ctx.fillText('−',e.x,e.y+3);
+        });
+
+        ctx.strokeStyle='rgba(255,220,0,0.35)'; ctx.lineWidth=1.4; ctx.setLineDash([5,5]);
+        for(let y=28; y<H; y+=56){
+            ctx.beginPath(); ctx.moveTo(8,y); ctx.lineTo(W-8,y); ctx.stroke();
+            ctx.fillStyle='rgba(255,220,0,0.5)'; ctx.setLineDash([]);
+            ctx.beginPath(); ctx.moveTo(W-8,y); ctx.lineTo(W-18,y-6); ctx.lineTo(W-18,y+6); ctx.closePath(); ctx.fill();
+            ctx.setLineDash([5,5]);
+        }
+        ctx.setLineDash([]);
+        ctx.fillStyle='rgba(255,220,100,0.65)'; ctx.font='10px Malgun Gothic';
+        ctx.textAlign='left'; ctx.fillText('🔴 원자핵(+)  🔵 자유전자(−)',8,H-8);
+
+        simAF = requestAnimationFrame(draw);
+    }
+    draw();
+}
+
+/* ═══════════════════════════════════════════
+   분자 시뮬레이션 — 부도체
+═══════════════════════════════════════════ */
+function animateInsulatorSim() {
+    const cv  = document.getElementById('simCanvas');
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    let t = 0;
+
+    const atoms = [];
+    for(let cx=50; cx<W-20; cx+=75)
+        for(let cy=50; cy<H-20; cy+=75)
+            atoms.push({x:cx, y:cy,
+                elAngles:[0,Math.PI,Math.PI/2,Math.PI*1.5],
+                phase:Math.random()*Math.PI*2});
+
+    function draw() {
+        t += 0.02;
+        fillBg(ctx,W,H,'#000a18','#001025');
+
+        ctx.strokeStyle='rgba(0,200,255,0.18)'; ctx.lineWidth=1.4; ctx.setLineDash([4,6]);
+        for(let y=35; y<H; y+=55){
+            ctx.beginPath(); ctx.moveTo(8,y); ctx.lineTo(W/2-18,y); ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.strokeStyle='rgba(255,80,80,0.75)'; ctx.lineWidth=2.5;
+            const mx=W/2;
+            ctx.beginPath();
+            ctx.moveTo(mx-9,y-8); ctx.lineTo(mx+9,y+8);
+            ctx.moveTo(mx+9,y-8); ctx.lineTo(mx-9,y+8);
+            ctx.stroke();
+            ctx.strokeStyle='rgba(0,200,255,0.18)'; ctx.lineWidth=1.4; ctx.setLineDash([4,6]);
+        }
+        ctx.setLineDash([]);
+
+        atoms.forEach(a => {
+            const ag=ctx.createRadialGradient(a.x,a.y,0,a.x,a.y,20);
+            ag.addColorStop(0,'rgba(0,150,255,0.22)'); ag.addColorStop(1,'rgba(0,80,255,0)');
+            ctx.fillStyle=ag; ctx.beginPath(); ctx.arc(a.x,a.y,20,0,Math.PI*2); ctx.fill();
+            ctx.strokeStyle='rgba(0,150,255,0.14)'; ctx.lineWidth=1;
+            ctx.beginPath(); ctx.arc(a.x,a.y,18,0,Math.PI*2); ctx.stroke();
+            ctx.beginPath(); ctx.arc(a.x,a.y,8,0,Math.PI*2); ctx.fillStyle='#0066cc'; ctx.fill();
+            ctx.beginPath(); ctx.arc(a.x,a.y,5,0,Math.PI*2); ctx.fillStyle='#44aaff'; ctx.fill();
+            ctx.fillStyle='#001830'; ctx.font='bold 8px Arial'; ctx.textAlign='center';
+            ctx.fillText('+',a.x,a.y+3);
+            a.elAngles.forEach(ang=>{
+                const vib=Math.sin(t*3+a.phase)*1.4;
+                const ex=a.x+Math.cos(ang)*(18+vib);
+                const ey=a.y+Math.sin(ang)*(18+vib);
+                ctx.strokeStyle='rgba(0,180,255,0.28)'; ctx.lineWidth=1;
+                ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(ex,ey); ctx.stroke();
+                const eg=ctx.createRadialGradient(ex,ey,0,ex,ey,5);
+                eg.addColorStop(0,'rgba(0,220,255,1)'); eg.addColorStop(1,'rgba(0,100,255,0)');
+                ctx.beginPath(); ctx.arc(ex,ey,5,0,Math.PI*2); ctx.fillStyle=eg; ctx.fill();
+                ctx.fillStyle='#001030'; ctx.font='bold 7px Arial'; ctx.textAlign='center';
+                ctx.fillText('−',ex,ey+2.5);
+            });
+        });
+
+        ctx.fillStyle='rgba(0,220,255,0.65)'; ctx.font='10px Malgun Gothic';
+        ctx.textAlign='left'; ctx.fillText('🔵 핵에 묶인 전자 — 이동 불가!',8,H-8);
+
+        simAF = requestAnimationFrame(draw);
+    }
+    draw();
+}
+
+/* ═══════════════════════════════════════════
+   회로 시뮬레이션
+═══════════════════════════════════════════ */
+function animateCircuit(on) {
+    const cv  = document.getElementById('circuitCanvas');
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    let t = 0;
+
+    const pad = 42;
+    const path = [
+        {x:pad,   y:pad},
+        {x:W-pad, y:pad},
+        {x:W-pad, y:H-pad},
+        {x:pad,   y:H-pad},
+    ];
+
+    const particles = [];
+    if(on){
+        for(let i=0;i<14;i++)
+            particles.push({t:i/14, speed:0.004+Math.random()*0.002});
+    }
+
+    function getPathPoint(tt) {
+        tt = ((tt%1)+1)%1;
+        const seg  = Math.floor(tt*4);
+        const frac = (tt*4)-seg;
+        const p0   = path[seg];
+        const p1   = path[(seg+1)%4];
+        return {x:p0.x+(p1.x-p0.x)*frac, y:p0.y+(p1.y-p0.y)*frac};
+    }
+
+    const batX=W/2, batY=pad;
+    const bulbX=W/2, bulbY=H-pad;
+    const swX=pad,   swY=H/2;
+    const matX=W-pad, matY=H/2;
+
+    function draw() {
+        t += 0.016;
+        fillBg(ctx,W,H,'#050510','#0a0a20');
+
+        /* 회로 선 */
+        ctx.strokeStyle = on ? '#ffd200' : '#334466';
+        ctx.lineWidth   = on ? 3 : 2;
+        ctx.shadowColor = on ? '#ffd200' : 'transparent';
+        ctx.shadowBlur  = on ? 7 : 0;
+
+        const segs = [
+            [pad, pad,   batX-22, pad],
+            [batX+22, pad, W-pad, pad],
+            [W-pad, pad,   matX, matY-22],
+            [matX, matY+22, W-pad, H-pad],
+            [W-pad, H-pad,  bulbX+22, H-pad],
+            [bulbX-22, H-pad, pad, H-pad],
+            [pad, H-pad,  swX, swY+16],
+            [swX, swY-16, pad, pad],
+        ];
+        segs.forEach(([x1,y1,x2,y2])=>{
+            ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+        });
+        ctx.shadowBlur = 0;
+
+        /* 부품 */
+        drawBattery(ctx, batX, batY, on);
+        drawBulb(ctx, bulbX, bulbY, on, t);
+        drawSwitch(ctx, swX, swY, on);
+        drawMaterial(ctx, matX, matY, on);
+
+        /* 전류 입자 */
+        if(on){
+            particles.forEach(p=>{
+                p.t=(p.t+p.speed)%1;
+                const pt=getPathPoint(p.t);
+                ctx.shadowColor='#aaddff'; ctx.shadowBlur=8;
+                const pg=ctx.createRadialGradient(pt.x,pt.y,0,pt.x,pt.y,5);
+                pg.addColorStop(0,'rgba(200,240,255,1)');
+                pg.addColorStop(1,'rgba(50,150,255,0)');
+                ctx.beginPath(); ctx.arc(pt.x,pt.y,5,0,Math.PI*2);
+                ctx.fillStyle=pg; ctx.fill();
+                ctx.shadowBlur=0;
+            });
+        }
+
+        circuitAF = requestAnimationFrame(draw);
+    }
+    draw();
+}
+
+/* ── 건전지 ── */
+function drawBattery(ctx,x,y,on){
+    ctx.fillStyle = on?'#ffaa00':'#445566';
+    ctx.fillRect(x-22,y-10,44,20);
+    ctx.fillStyle = on?'#ffdd00':'#334455';
+    ctx.fillRect(x+22,y-6,7,12);
+    ctx.fillStyle = on?'#cc8800':'#223344';
+    ctx.fillRect(x-29,y-4,7,8);
+    ctx.fillStyle='#fff'; ctx.font='bold 10px Arial'; ctx.textAlign='center';
+    ctx.fillText('🔋 건전지',x,y+4);
+    ctx.font='bold 13px Arial';
+    ctx.fillText('+',x+26,y+5);
+    ctx.fillText('−',x-26,y+5);
+}
+
+/* ── 전구 ── */
+function drawBulb(ctx,x,y,on,t){
+    const flicker = on ? 0.85+Math.sin(t*12)*0.15 : 0;
+    if(on){
+        const glow=ctx.createRadialGradient(x,y,0,x,y,44*flicker);
+        glow.addColorStop(0,`rgba(255,255,150,${0.55*flicker})`);
+        glow.addColorStop(0.5,`rgba(255,220,50,${0.3*flicker})`);
+        glow.addColorStop(1,'rgba(255,200,0,0)');
+        ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(x,y,44,0,Math.PI*2); ctx.fill();
+    }
+    ctx.beginPath(); ctx.arc(x,y,18,0,Math.PI*2);
+    ctx.fillStyle=on?`rgba(255,${200+Math.floor(55*flicker)},${Math.floor(100*flicker)},${0.9*flicker+0.1})`:'rgba(80,100,120,0.7)';
+    ctx.fill();
+    ctx.strokeStyle=on?'#ffd200':'#445566'; ctx.lineWidth=2; ctx.stroke();
+    ctx.strokeStyle=on?`rgba(255,255,200,${flicker})`:'#556677'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(x-6,y+4); ctx.lineTo(x-2,y-4); ctx.lineTo(x+2,y+4); ctx.lineTo(x+6,y-4); ctx.stroke();
+    ctx.fillStyle=on?'#aa8800':'#334455'; ctx.fillRect(x-8,y+16,16,8);
+    ctx.strokeStyle=on?'#ffd200':'#334466'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.moveTo(x-6,y+24); ctx.lineTo(x-6,y+30); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x+6,y+24); ctx.lineTo(x+6,y+30); ctx.stroke();
+    ctx.fillStyle=on?'#ffee88':'#667799'; ctx.font='bold 10px Malgun Gothic'; ctx.textAlign='center';
+    ctx.fillText(on?'💡 켜짐!':'💡 꺼짐',x,y+44);
+}
+
+/* ── 스위치 ── */
+function drawSwitch(ctx,x,y,on){
+    ctx.fillStyle='#aabbcc';
+    ctx.beginPath(); ctx.arc(x,y-15,4,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x,y+15,4,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=on?'#ffd200':'#556688'; ctx.lineWidth=3;
+    ctx.beginPath();
+    if(on){ ctx.moveTo(x,y+15); ctx.lineTo(x,y-15); }
+    else  { ctx.moveTo(x,y+15); ctx.lineTo(x+18,y-10); }
+    ctx.stroke();
+    ctx.fillStyle=on?'#ffd200':'#778899'; ctx.font='9px Malgun Gothic'; ctx.textAlign='center';
+    ctx.fillText(on?'🔒닫힘':'🔓열림',x,y+30);
+}
+
+/* ── 재료 심볼 ── */
+function drawMaterial(ctx,x,y,on){
+    const bg  = on?'rgba(255,200,0,0.18)':'rgba(0,200,255,0.18)';
+    const bdr = on?'rgba(255,200,0,0.55)':'rgba(0,200,255,0.55)';
+    const col = on?'#ffd200':'#00f2fe';
+    ctx.strokeStyle=bdr; ctx.lineWidth=2; ctx.fillStyle=bg;
+    roundRect(ctx,x-32,y-24,64,48,8); ctx.fill(); ctx.stroke();
+    ctx.fillStyle=col; ctx.font='bold 10px Malgun Gothic'; ctx.textAlign='center';
+    ctx.fillText(on?'구리선':'고무',x,y-2);
+    ctx.fillText(on?'(도체)':'(부도체)',x,y+13);
+    ctx.font='15px Arial'; ctx.fillText(on?'🪙':'⭕',x,y-14);
+}
+
+function roundRect(ctx,x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+    ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+    ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+    ctx.closePath();
+}
+</script>
+</body>
+</html>
